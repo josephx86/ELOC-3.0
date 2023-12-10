@@ -77,8 +77,6 @@
 
 static const char *TAG = "main";
 
-bool gMountedSDCard = false;
-
 /**
  * @brief Should inference be run on sound samples? 
  * @todo Set from Bluetooth / config file
@@ -108,13 +106,6 @@ uint32_t gFreeSpaceKB = 0;
 
 // String gTimeDifferenceCode; //see getTimeDifferenceCode() below
 
-#ifdef USE_SPI_VERSION
-    SDCard *sd_card = nullptr;
-#endif
-
-#ifdef USE_SDIO_VERSION
-    SDCardSDIO *sd_card = nullptr;
-#endif
 
 I2SMEMSSampler *input = nullptr;
 WAVFileWriter *wav_writer = nullptr;
@@ -488,93 +479,6 @@ void doDeepSleep()
     esp_restart();
 }
 
-bool mountSDCard()
-{
-    gMountedSDCard = false;
-#ifdef USE_SPI_VERSION
-    ESP_LOGI(TAG, "TRYING to mount SDCArd, SPI ");
-    sd_card = new SDCard("/sdcard", PIN_NUM_MISO, PIN_NUM_MOSI, PIN_NUM_CLK, PIN_NUM_CS);
-#endif
-
-#ifdef USE_SDIO_VERSION
-
-        ESP_LOGI(TAG, "TRYING to mount SDCArd, SDIO ");
-        sd_card = new SDCardSDIO("/sdcard");
-        if (sd_card->isMounted()) {
-            ESP_LOGI(TAG, "SD card mounted ");
-            const char* ELOC_FOLDER = "/sdcard/eloc";
-            if (!ffsutil::folderExists(ELOC_FOLDER)) {
-                ESP_LOGI(TAG, "%s does not exist, creating empty folder", ELOC_FOLDER);
-                mkdir(ELOC_FOLDER, 0777);
-            }
-            float freeSpace = sd_card->freeSpaceGB();
-            float totalSpace = sd_card->getCapacityMB()/1024;
-            ESP_LOGI(TAG, "SD card %f / %f GB free", freeSpace, totalSpace);
-        }
-    #endif
-    gMountedSDCard = sd_card->isMounted();
-    return gMountedSDCard;
-}
-
-esp_err_t checkSDCard() {
-
-    if (!gMountedSDCard) {
-        // in case SD card is not yet mounted, mout it now, e.g. not inserted durint boot
-        if (!mountSDCard()) {
-            return ESP_ERR_NOT_FOUND;
-        }
-    }
-    // getupdated free space
-    float freeSpaceGB = sd_card->freeSpaceGB();
-    if ((freeSpaceGB > 0.0) && (freeSpaceGB < 0.5)) {
-        //  btwrite("!!!!!!!!!!!!!!!!!!!!!");
-        //  btwrite("SD Card full. Cannot record");
-        //  btwrite("!!!!!!!!!!!!!!!!!!!!!");
-        ESP_LOGE(TAG, "SD card is full, Free space %.3f GB", freeSpaceGB);
-        return ESP_ERR_NO_MEM;
-    }
-    return ESP_OK;
-}
-
-void saveStatusToSD()
-{
-    String sendstring;
-
-    sendstring = sendstring + "Session ID:  " + gSessionIdentifier + "\n";
-
-    sendstring = sendstring + "Session Start Time:  " + String(timeObject.getYear()) + "-" + String(timeObject.getMonth()) + "-" +
-                 String(timeObject.getDay()) + " " + String(timeObject.getHour(true)) + ":" + String(timeObject.getMinute()) + ":" +
-                 String(timeObject.getSecond()) + "\n";
-
-    sendstring = sendstring + "Firmware Version:  " + gFirmwareVersion + "\n"; // firmware
-
-    sendstring = sendstring + "File Header:  " + getDeviceInfo().fileHeader + "\n"; // file header
-
-    sendstring = sendstring + "Bluetooth on when Record?:   " + (getConfig().bluetoothEnableDuringRecord ? "on" : "off") + "\n";
-
-    sendstring = sendstring + "Sample Rate:  "      + String(getMicInfo().MicSampleRate) + "\n";
-    sendstring = sendstring + "Seconds Per File:  " + String(getConfig().secondsPerFile) + "\n";
-
-    // sendstring=sendstring+   "Voltage Offset:  " +String(gVoltageOffset)                  + "\n" ;
-    sendstring = sendstring + "Mic Type:  "         + getMicInfo().MicType + "\n";
-    sendstring = sendstring + "SD Card Free GB:   " + String(sd_card->freeSpaceGB()) + "\n";
-    sendstring = sendstring + "Mic Gain:  "         + String(getMicInfo().MicBitShift) + "\n";
-    sendstring = sendstring + "GPS Location:  "     + getDeviceInfo().locationCode + "\n";
-    sendstring = sendstring + "GPS Accuracy:  "     + getDeviceInfo().locationAccuracy + " m\n";
-
-    // sendstring=sendstring+ "\n\n";
-
-    FILE *fp;
-    String temp = "/sdcard/eloc/" + gSessionIdentifier + "/" + "config_" + gSessionIdentifier + ".txt";
-    fp = fopen(temp.c_str(), "wb");
-    // fwrite()
-    // String temp=
-    // String temp="/sdcard/eloc/test.txt";
-    // File file = SD.open(temp.c_str(), FILE_WRITE);
-    // file.print(sendstring);
-    fputs(sendstring.c_str(), fp);
-    fclose(fp);
-}
 
 /**
  * @brief Get the configuration of the I2S microphone
@@ -651,7 +555,7 @@ bool inference_result_file_SD_available = false;
 int create_inference_result_file_SD(String f_name)
 {
 
-    if (checkSDCard() != ESP_OK)
+    if (ElocSystem::GetInstance().checkSDCard() != ESP_OK)
     {
         // Abandon
         return -1;
@@ -841,7 +745,6 @@ void app_main(void)
         ESP_LOGI(TAG, "An Error has occurred while mounting SPIFFS");
         // return;
     }
-    mountSDCard();
 
     if (0)
     {
@@ -863,7 +766,7 @@ void app_main(void)
     // TODO: BUGME: Crash when writing to wav & log file simultaneously?
 
     //setup persistent logging only if SD card is mounted
-    if (sd_card && sd_card->isMounted()) {
+    if (ElocSystem::GetInstance().isSDCardMounted()) {
         const logConfig_t& cfg= getConfig().logConfig;
         esp_err_t err = Logging::init(cfg.logToSdCard, cfg.filename, cfg.maxFiles, cfg.maxFileSize);
         if (err != ESP_OK) {
@@ -916,7 +819,7 @@ void app_main(void)
     }
 
     // Check if file exists to record results
-    if (gMountedSDCard == true)
+    if (ElocSystem::GetInstance().isSDCardMounted() == true)
     {
         create_inference_result_file_SD(ei_results_filename);
     }
@@ -1038,7 +941,7 @@ void app_main(void)
         // Zero DMA buffer, prevents popping sound on start
         input->zero_dma_buffer(I2S_DEFAULT_PORT);              
 
-        if (checkSDCard() == ESP_OK){
+        if (ElocSystem::GetInstance().checkSDCard() == ESP_OK){
             // create a new wave file wav_writer & make sure sample rate is up to date
             wav_writer = new WAVFileWriter((int32_t)(i2s_get_clk(I2S_DEFAULT_PORT)), 2, NUMBER_OF_CHANNELS);
             // Block until properly registered otherwise will get error later
@@ -1124,7 +1027,7 @@ void app_main(void)
         if (wav_writer != nullptr &&
             wav_writer->is_file_handle_set() == false && 
             wav_writer->get_mode() == WAVFileWriter::Mode::continuous &&
-            checkSDCard() == ESP_OK)
+            ElocSystem::GetInstance().checkSDCard() == ESP_OK)
         {   
             start_sound_recording(fp);
         }
@@ -1222,7 +1125,7 @@ void app_main(void)
                             if (wav_writer != nullptr &&
                                 wav_writer->is_file_handle_set() == false && 
                                 wav_writer->get_mode() == WAVFileWriter::Mode::single &&
-                                checkSDCard() == ESP_OK)
+                                ElocSystem::GetInstance().checkSDCard() == ESP_OK)
                             {   
                                 start_sound_recording(fp);
                             }
@@ -1232,7 +1135,7 @@ void app_main(void)
                     file_str += "\n";
                     // Save results to file
                     // TODO: Only save results & wav file if classification value exceeds a threshold?
-                    if (save_ai_results_to_sd == true && checkSDCard() == ESP_OK)
+                    if (save_ai_results_to_sd == true && ElocSystem::GetInstance().checkSDCard() == ESP_OK)
                     {
                         save_inference_result_SD(ei_results_filename, file_str);
                     }              
@@ -1269,11 +1172,6 @@ void app_main(void)
         wav_writer->finish();
         delete wav_writer;
         wav_writer = nullptr;
-    }
-
-    if (sd_card != nullptr){
-        delete sd_card;
-        sd_card = nullptr;
     }
 
     ESP_LOGI(TAG, "app_main done");
