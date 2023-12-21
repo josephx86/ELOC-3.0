@@ -12,6 +12,12 @@ class I2SSampler {
     i2s_config_t m_i2s_config;
 
     /**
+     * Ideally it would be possible to probe hardware to see if it's
+     * running, but doesn't seem possible. Use this instead ..
+    */
+    bool i2s_installed_and_started = false;
+
+    /**
      * @brief Configure I2S port
     */
     virtual bool configureI2S() = 0;
@@ -43,6 +49,7 @@ class I2SSampler {
 
     /**
      * @brief Read data from I2S
+     * @return number of bytes read
     */
     virtual int read() = 0;
 
@@ -57,4 +64,10 @@ class I2SSampler {
     virtual int sample_rate() {
         return m_i2s_config.sample_rate;
     }
+
+    /**
+     * @brief Check if I2S port already installed & started
+    */
+    virtual bool is_i2s_installed_and_started() {return i2s_installed_and_started;}
+
 };

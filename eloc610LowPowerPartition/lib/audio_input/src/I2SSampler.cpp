@@ -15,6 +15,7 @@ esp_err_t I2SSampler::install_and_start()
 
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Func: %s, i2s_driver_install", __func__);
+        return ret;
     }
 
     // set up the I2S configuration from the subclass
@@ -22,7 +23,10 @@ esp_err_t I2SSampler::install_and_start()
 
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Func: %s, configureI2S", __func__);
+        return ret;
     }
+
+    i2s_installed_and_started = true;
 
     return ret;
 }
@@ -37,6 +41,8 @@ esp_err_t I2SSampler::uninstall()
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Func: %s, i2s_driver_uninstall", __func__);
     }
+
+    i2s_installed_and_started = false;
 
     return ret;
 }
