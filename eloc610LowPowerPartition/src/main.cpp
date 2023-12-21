@@ -83,7 +83,7 @@ FILE *fp = nullptr;
  * @brief Should inference be run on sound samples? 
  * @todo Set from Bluetooth / config file
  */
-bool ai_run_enable = true;
+bool ai_run_enable = false;
 
 /**
  * @brief The size of the buffer for I2SMEMSampler to store the sound samples
@@ -1112,11 +1112,11 @@ void app_main(void) {
         // input->install_and_start();
 
         // Zero DMA buffer, prevents popping sound on start
-        input->zero_dma_buffer(I2S_DEFAULT_PORT);
+        // input->zero_dma_buffer(I2S_DEFAULT_PORT);
 
         if (checkSDCard() == ESP_OK) {
             // create a new wave file wav_writer & make sure sample rate is up to date
-            if (wav_writer.initialize((int32_t)(i2s_get_clk(I2S_DEFAULT_PORT)), 2, NUMBER_OF_CHANNELS) != true) {
+            if (wav_writer.initialize(i2s_mic_Config.sample_rate, 2, NUMBER_OF_CHANNELS) != true) {
                 ESP_LOGE(TAG, "Failed to initialize WAVFileWriter");
             }
 
@@ -1194,6 +1194,7 @@ void app_main(void) {
             // Keep trying until successful
             if (input->install_and_start() == ESP_OK) {
                 delay(300);
+                input->zero_dma_buffer(I2S_DEFAULT_PORT);
                 input->start_read_task(sample_buffer_size/ sizeof(signed short));
             }
         }
