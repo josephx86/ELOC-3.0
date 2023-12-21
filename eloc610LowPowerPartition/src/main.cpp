@@ -1108,7 +1108,8 @@ void app_main(void) {
         ESP_LOGE(TAG, "Failed to create I2SMEMSSampler");
         return;
     } else {
-        input->install_and_start();
+        // Don't start I2S unless required
+        // input->install_and_start();
 
         // Zero DMA buffer, prevents popping sound on start
         input->zero_dma_buffer(I2S_DEFAULT_PORT);
@@ -1126,7 +1127,7 @@ void app_main(void) {
             }
 
             // TODO: DEBUG - should be set from Bluetooth config
-            wav_writer.set_mode(WAVFileWriter::Mode::disabled);
+            // wav_writer.set_mode(WAVFileWriter::Mode::disabled);
 
         } else {
             ESP_LOGE(TAG, "SD card not mounted, cannot create WAVFileWriter");
@@ -1147,8 +1148,6 @@ void app_main(void) {
             edgeImpulse->set_status(edgeImpulse->Status::running);
             edgeImpulse->start_ei_thread(ei_callback_func);
         #endif
-
-        input->start_read_task(sample_buffer_size/ sizeof(signed short));
     }
 
     auto loopCnt = 0;
@@ -1185,6 +1184,17 @@ void app_main(void) {
             if (0) {
                 ESP_LOGI(TAG, "Min free heap since boot = %d bytes", heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));
                 ESP_LOGI(TAG, "Min free PSRAM since boot = %d bytes", heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
+            }
+        }
+
+        // Need to start I2S?
+        // Note: Once started continues to run..
+        if ((wav_writer.get_mode() != WAVFileWriter::Mode::disabled || ai_run_enable != false) &&
+            input->is_i2s_installed_and_started() == false) {
+            // Keep trying until successful
+            if (input->install_and_start() == ESP_OK) {
+                delay(300);
+                input->start_read_task(sample_buffer_size/ sizeof(signed short));
             }
         }
 
