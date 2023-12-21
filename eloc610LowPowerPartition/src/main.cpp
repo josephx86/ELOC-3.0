@@ -181,20 +181,18 @@ void testInput()
 {
     ESP_LOGV(TAG, "Func: %s", __func__);
 
-    for (uint32_t i = 1000; i < 34000; i = i + 2000)
-    {
+    for (uint32_t i = 1000; i < 34000; i = i + 2000) {
         i2s_mic_Config.sample_rate = i;
         i2s_mic_Config.use_apll = getMicInfo().MicUseAPLL;
 
         input = new I2SMEMSSampler(I2S_NUM_0, i2s_mic_pins, i2s_mic_Config, getMicInfo().MicBitShift, getConfig().listenOnly, getMicInfo().MicUseTimingFix);
-        input->start();
+        input->install_and_start();
         delay(100);
         ESP_LOGI(TAG, "Clockrate: %f", i2s_get_clk(I2S_NUM_0));
-        input->stop();
+        input->uninstall();
         delay(100);
     }
 
-    delete input;
     input = nullptr;
     delay(100);
 }
@@ -1110,7 +1108,7 @@ void app_main(void) {
         ESP_LOGE(TAG, "Failed to create I2SMEMSSampler");
         return;
     } else {
-        input->start();
+        input->install_and_start();
 
         // Zero DMA buffer, prevents popping sound on start
         input->zero_dma_buffer(I2S_DEFAULT_PORT);
@@ -1232,7 +1230,7 @@ void app_main(void) {
 
     // Should never get here
     if (input != nullptr) {
-        input->stop();
+        input->uninstall();
         delete input;
         input = nullptr;
     }

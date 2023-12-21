@@ -49,7 +49,7 @@ bool I2SMEMSSampler::configureI2S() {
     return ret;
 }
 
-bool I2SMEMSSampler::zero_dma_buffer(i2s_port_t i2sPort) {
+esp_err_t I2SMEMSSampler::zero_dma_buffer(i2s_port_t i2sPort) {
     auto ret = i2s_zero_dma_buffer((i2s_port_t) i2sPort);
 
     if (ret != ESP_OK) {
@@ -81,7 +81,6 @@ bool I2SMEMSSampler::deregister_wavFileWriter() {
 }
 
 bool I2SMEMSSampler::register_ei_inference(inference_t *ext_inference, int ext_ei_sampling_freq) {
-
     ESP_LOGV(TAG, "Func: %s", __func__);
 
     inference = ext_inference;
@@ -320,7 +319,6 @@ int I2SMEMSSampler::read()
                 }
             #endif
         }
-
     }
 
     if (0) {

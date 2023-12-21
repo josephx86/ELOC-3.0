@@ -84,9 +84,9 @@ class I2SMEMSSampler : public I2SSampler
      * @brief Zero the appropiate TX DMA buffer for the I2S port
      * @note This is required to prevent a pop at the start of the audio
      * @note This is only required for TX (i.e. recording)
-     * @return true on success
+     * @return esp_err_t
     */
-    bool zero_dma_buffer(i2s_port_t i2sPort) override;
+    esp_err_t zero_dma_buffer(i2s_port_t i2sPort) override;
 
     /**
      * @brief Register an external WAVFileWriter

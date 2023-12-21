@@ -6,50 +6,55 @@
 /**
  * Base Class for both the ADC and I2S sampler
  **/
-class I2SSampler
-{
-protected:
+class I2SSampler {
+ protected:
     i2s_port_t m_i2sPort = I2S_NUM_0;
     i2s_config_t m_i2s_config;
+
+    /**
+     * @brief Configure I2S port
+    */
     virtual bool configureI2S() = 0;
-    
+
     /**
      * @brief Un-configure I2S port
     */
-    virtual void unConfigureI2S(){};
-    
-    
-    virtual void processI2SData(void *samples, size_t count){
-        // nothing to do for the default case
-    };
+    virtual void unConfigureI2S() {}
 
-public:
+    /**
+     * @note nothing to do for the default case
+     */ 
+    virtual void processI2SData(void *samples, size_t count) {}
+
+ public:
     I2SSampler(i2s_port_t i2sPort, const i2s_config_t &i2sConfig);
 
     /**
      * @brief Zero the appropiate DMA buffer for the I2S port
      * @return true on success
     */
-    virtual bool zero_dma_buffer(i2s_port_t i2sPort) = 0;
+    virtual esp_err_t zero_dma_buffer(i2s_port_t i2sPort) = 0;
 
     /**
-     * @brief Install the I2S port
-     * TODO: This really should be renamed install, not start
+     * @brief Install & start the I2S port
      * @return true on success
     */
-    bool start();
+    virtual esp_err_t install_and_start();
 
-    virtual int read() = 0;
-    
     /**
-     * @brief Uninstall the I2S port
-     * TODO: This really should be renamed uninstall, not stop
-     * 
+     * @brief Read data from I2S
+    */
+    virtual int read() = 0;
+
+    /**
+     * @brief Uninstall and stop the I2S port
      */
-    void stop();
-    
-    int sample_rate()
-    {
+    virtual esp_err_t uninstall();
+
+    /**
+     * @brief Get the current sample rate
+    */
+    virtual int sample_rate() {
         return m_i2s_config.sample_rate;
     }
 };
